@@ -1,7 +1,7 @@
 const express = require('express')
 const app = express()
 require('dotenv').config()
-const nodemailer = require('nodemailer') 
+const nodemailer = require('nodemailer')
 const { v4: uuidv4 } = require('uuid')
 const sqlite3 = require('sqlite3').verbose()
 
@@ -48,8 +48,14 @@ app.post('/pay', async (req, res) => {
 	const tx_ref = uuidv4()
 	const email = req.body.email
 	const phone_number = '+256' + req.body.phone
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const phoneRegex = /^\d{9}$/;
+	if (!emailRegex.test(email) || !phoneRegex.test(req.body.phone)) {
+		res.send({ error: "Please avoid tampering with the code" })
+		return
+	}
 
-	db.run('INSERT INTO payments (email, tx_ref, phone_number) VALUES (?, ?, ?)', 
+	db.run('INSERT INTO payments (email, tx_ref, phone_number) VALUES (?, ?, ?)',
 		[email, tx_ref, phone_number], (err) => {
 			if (err) {
 				console.error('Error inserting into database:', err.message)
@@ -64,7 +70,7 @@ app.post('/pay', async (req, res) => {
 		currency: 'UGX',
 		email: email,
 		phone_number: phone_number,
-		redirect_url: 'https://kisembopayments.vercel.app/redirect'
+		redirect_url: 'https://kisembopaymentstransit.vercel.app/'
 	}
 	try {
 		const otp = await fetch("https://api.flutterwave.com/v3/charges?type=mobile_money_uganda", {
@@ -111,7 +117,7 @@ app.post('/afterbill', async (req, res) => {
 						service: 'gmail',
 						auth: {
 							user: process.env.GMAIL_USER,
-							pass: process.env.GMAIL_PASS 
+							pass: process.env.GMAIL_PASS
 						}
 					})
 

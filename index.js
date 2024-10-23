@@ -174,7 +174,7 @@ app.post('/afterbill', async (req, res) => {
 	}
 })
 
-shareFile('1T3C7-ZMPCBF5V6S0peCuvjgcklKZJAoh', 'edgarrntonde@gmail.com')
+// shareFile('1T3C7-ZMPCBF5V6S0peCuvjgcklKZJAoh', 'edgarrntonde@gmail.com')
 
 app.listen(3000, () => {
 	console.log('Server is running on port 3000')

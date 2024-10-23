@@ -4,12 +4,33 @@ require('dotenv').config()
 const nodemailer = require('nodemailer')
 const { v4: uuidv4 } = require('uuid')
 const sqlite3 = require('sqlite3').verbose()
+const { google } = require('googleapis');
+const fs = require('fs');
+const path = require('path');
+const readline = require('readline');
+
+const SCOPES = ['https://www.googleapis.com/auth/drive.file'];
+// const CREDENTIALS_PATH = path.join(__dirname, 'credentials.json');
+const credentials = JSON.parse(fs.readFileSync('credentials.json'));
+const TOKEN_PATH = path.join(__dirname, 'token.json');
+
+const { client_secret, client_id, redirect_uris } = credentials.web;
+const oAuth2Client = new google.auth.OAuth2(
+  client_id, client_secret, redirect_uris[0]
+);
+
+if (fs.existsSync(TOKEN_PATH)) {
+  const token = fs.readFileSync(TOKEN_PATH);
+  oAuth2Client.setCredentials(JSON.parse(token));
+} else {
+  getNewToken(oAuth2Client);
+}
 
 const db = new sqlite3.Database('./payments.db', (err) => {
 	if (err) {
 		console.error('Error opening database:', err.message)
 	} else {
-		console.log('Connected to the SQLite database.')
+		// console.log('Connected to the SQLite database.')
 
 		db.run(`CREATE TABLE IF NOT EXISTS payments (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,6 +112,59 @@ app.post('/pay', async (req, res) => {
 	}
 })
 
+function getNewToken(oAuth2Client) {
+  const authUrl = oAuth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: SCOPES,
+  });
+  console.log('Authorize this app by visiting this URL:', authUrl);
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  rl.question('Enter the code from that page here: ', (code) => {
+    rl.close();
+    oAuth2Client.getToken(code, (err, token) => {
+      if (err) return console.error('Error retrieving access token', err);
+      oAuth2Client.setCredentials(token);
+
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(token));
+      console.log('Token stored to', TOKEN_PATH);
+    });
+  });
+}
+
+async function grantEmailPermission(email) {
+	const fileId = '432442342'
+	try {
+    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+
+    await drive.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'reader', 
+        type: 'user',
+        emailAddress: email,
+      },
+    });
+
+    // Optionally send an email notification about the shared file
+    // await drive.files.update({
+    //   fileId: fileId,
+    //   requestBody: {
+    //     emailMessage: 'You have been granted access to this file.',
+    //   },
+    // });
+
+    res.status(200).json({ message: `File shared with ${email}` });
+  } catch (error) {
+    console.error('Error sharing file:', error);
+    res.status(500).json({ error: 'Error sharing the file' });
+  }
+}
+
 app.post('/afterbill', async (req, res) => {
 	try {
 		if (req.headers["verif-hash"] != process.env.FLW_SECRET_HASH) throw new Error('Hash values do not match')
@@ -103,7 +177,7 @@ app.post('/afterbill', async (req, res) => {
 		if (data.status === 'successful') {
 			const tx_ref = data.tx_ref
 
-			db.get('SELECT email FROM payments WHERE tx_ref = ?', [tx_ref], (err, row) => {
+			db.get('SELECT email FROM payments WHERE tx_ref = ?', [tx_ref], async (err, row) => {
 				if (err) {
 					console.error('Error retrieving data from database:', err.message)
 					return res.status(500).send({ error: 'Database error' })
@@ -112,6 +186,7 @@ app.post('/afterbill', async (req, res) => {
 				if (row) {
 					const email = row.email
 					console.log('Email retrieved:', email)
+					await grantEmailPermission(email)
 
 					let transporter = nodemailer.createTransport({
 						service: 'gmail',
@@ -148,5 +223,5 @@ app.post('/afterbill', async (req, res) => {
 })
 
 app.listen(3000, () => {
-	console.log('Socket Server is running on port 3000')
+	// console.log('Server is running on port 3000')
 })

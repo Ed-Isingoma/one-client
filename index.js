@@ -7,27 +7,27 @@ const { v4: uuidv4 } = require('uuid')
 const sqlite3 = require('sqlite3').verbose()
 
 const auth = new google.auth.JWT({
-  email: process.env.GOOGLE_CLIENT_EMAIL,
-  key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/gm, '\n'),
-  scopes: ['https://www.googleapis.com/auth/drive'],
+	email: process.env.GOOGLE_CLIENT_EMAIL,
+	key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/gm, '\n'),
+	scopes: ['https://www.googleapis.com/auth/drive'],
 });
 
 async function shareFile(fileId, email) {
-  try {
-    const drive = google.drive({ version: 'v3', auth });
-    await drive.permissions.create({
-      fileId: fileId,
-      requestBody: {
-        role: 'reader', 
-        type: 'user',
-        emailAddress: email,
-      },
-    });
+	try {
+		const drive = google.drive({ version: 'v3', auth });
+		await drive.permissions.create({
+			fileId: fileId,
+			requestBody: {
+				role: 'reader',
+				type: 'user',
+				emailAddress: email,
+			},
+		});
 
-    console.log(`File ${fileId} shared with ${email}`);
-  } catch (err) {
-    console.error('Error sharing file:', err);
-  }
+		console.log(`File ${fileId} shared with ${email}`);
+	} catch (err) {
+		console.error('Error sharing file:', err);
+	}
 }
 
 const db = new sqlite3.Database('./payments.db', (err) => {
@@ -171,6 +171,41 @@ app.post('/afterbill', async (req, res) => {
 		}
 	} catch (er) {
 		res.send({ error: er.message })
+	}
+})
+
+app.post('/hugging', async (req, res) => {
+
+	const prompt = `You are a teacher of chemistry. Give marks to this student and justification for the same. 
+		Question being answered by the student is: 
+		It is the year 2025 and you are among the first scientists on the planet Mars, trying to
+		make it suitable for human habitation. You are asked to mention what you need in order to
+		chemically make water from the laboratory and among the things you mention, there is 100
+		cubic meters of Oxygen gas plus 200 cubic metres of Hydrogen gas, which combine to form
+		water. The procurement officer at NASA has asked you to explain why you need twice the
+		amount of Hydrogen gas as that of Oxygen. Using your knowledge of groups and valencies
+		of elements in the periodic table, write a formal letter explaining why.`;
+
+	try {
+		const response = await fetch('https://api-inference.huggingface.co/models/llava-hf/llava-1.5-7b-hf', {
+			method: 'POST',
+			headers: {
+				'Authorization': 'Bearer ' + process.env.HUGG_TOKEN,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				inputs: {
+					prompt: prompt,
+					image: req.body.image
+				}
+			})
+		});
+
+		const result = await response.json();
+		console.log(result)
+		res.send({ result: result?.generated_text || "No response"})
+	} catch (er) {
+		res.send({ error: er })
 	}
 })
 

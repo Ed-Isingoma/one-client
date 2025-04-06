@@ -5,6 +5,7 @@ require('dotenv').config()
 const nodemailer = require('nodemailer')
 const { v4: uuidv4 } = require('uuid')
 const sqlite3 = require('sqlite3').verbose()
+const bodyParser = require('body-parser');
 
 const auth = new google.auth.JWT({
 	email: process.env.GOOGLE_CLIENT_EMAIL,
@@ -46,6 +47,9 @@ const db = new sqlite3.Database('./payments.db', (err) => {
 })
 
 app.use(express.json())
+
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use((req, res, next) => {
 	res.set('Content-Security-Policy', "default-src 'self' https://one-client.onrender.com; script-src 'self' 'unsafe-inline';")

@@ -46,7 +46,6 @@ const db = new sqlite3.Database('./payments.db', (err) => {
 	}
 })
 
-app.use(express.json())
 app.use(express.json({ limit: '20mb' }));
 
 app.use((req, res, next) => {
@@ -177,7 +176,7 @@ app.post('/afterbill', async (req, res) => {
 })
 
 app.post('/hugging', async (req, res) => {
-
+  console.log('the headers length: ' + req.headers['content-length']);
 	const prompt = `You are a teacher of chemistry. Give marks to this student and justification for the same. 
 		Question being answered by the student is: 
 		It is the year 2025 and you are among the first scientists on the planet Mars, trying to
